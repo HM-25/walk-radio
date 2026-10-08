@@ -1,10 +1,13 @@
 """Audio stage: track scripts (intro, stories + directions, outro) -> Piper -> MP3 + .m3u"""
+import re
 import subprocess
 import tempfile
+import unicodedata
 import wave
 from pathlib import Path
 
 from piper import PiperVoice
+from piper.phonemize_espeak import EspeakPhonemizer
 
 VOICE = Path("voices/en_US-lessac-medium.onnx")
 PAUSE_S = 1.0  # silence between the story and the "Next stop" line
@@ -59,9 +62,46 @@ def stop_script(route: list[dict], i: int, story: str) -> list[str]:
     return parts
 
 
+SLOVAK_LETTERS = set("áäčďéíĺľňóôŕšťúýžÁÄČĎÉÍĹĽŇÓÔŔŠŤÚÝŽ")
+WORD = re.compile(r"\w+")
+
+
+class SlovakPronouncer:
+    """Swap Slovak words for Slovak IPA in Piper's inline [[ phoneme ]] syntax.
+
+    The English voice reads "Štrkovec" as letter soup. Piper's bundled espeak-ng
+    has Slovak, and every Slovak phoneme exists in the English voice's phoneme map,
+    so the English voice can say the names the Slovak way. Text files stay untouched.
+    """
+
+    def __init__(self, extra_words: set[str] = frozenset()):
+        self.espeak = EspeakPhonemizer()
+        self.extra_words = {w.lower() for w in extra_words}  # e.g. stop names without diacritics, like Kuchajda
+        self._ipa: dict[str, str] = {}
+
+    def is_slovak(self, word: str) -> bool:
+        return bool(SLOVAK_LETTERS & set(word)) or word.lower() in self.extra_words
+
+    def ipa(self, word: str) -> str:
+        if word not in self._ipa:
+            sentences = self.espeak.phonemize("sk", word)
+            ipa = "".join("".join(s) for s in sentences).strip(" .,;:!?")
+            # Piper NFD-normalises its own phonemes but not raw [[ ]] blocks
+            self._ipa[word] = unicodedata.normalize("NFD", ipa)
+        return self._ipa[word]
+
+    def __call__(self, text: str) -> str:
+        return WORD.sub(lambda m: f"[[ {self.ipa(m[0])} ]]" if self.is_slovak(m[0]) else m[0], text)
+
+
+def stop_name_words(route: list[dict]) -> set[str]:
+    return {w for p in route for name in (p["name"], p["summary"]["title"]) for w in WORD.findall(name)}
+
+
 class Renderer:
-    def __init__(self, voice_path: Path = VOICE):
+    def __init__(self, voice_path: Path = VOICE, pronounce=None):
         self.voice = PiperVoice.load(voice_path)
+        self.pronounce = pronounce or (lambda text: text)
 
     def render(self, parts: list[str], mp3_path: Path) -> None:
         """Speak each part, join with a short pause, encode to MP3."""
@@ -70,7 +110,7 @@ class Renderer:
             with wave.open(tmp.name, "wb") as wav:
                 fmt_set = False
                 for n, text in enumerate(parts):
-                    for chunk in self.voice.synthesize(text):
+                    for chunk in self.voice.synthesize(self.pronounce(text)):
                         if not fmt_set:
                             wav.setframerate(chunk.sample_rate)
                             wav.setsampwidth(chunk.sample_width)

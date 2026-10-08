@@ -71,7 +71,7 @@ To regenerate one story, delete its `.txt` file and run `uv run walkradio` again
 - **So there is a human step.** Read the stories before you walk (about 10 minutes for 5 stops), fix what's wrong, run `--audio-only`. Treat it as part of the workflow, not an optional extra.
 - **Straight-line routes.** No real routing: distances and directions are as the crow flies, and the real walk is longer. The intro estimates walking distance as straight-line distance × 1.3.
 - **No GPS triggering.** You press play on the next track when you arrive.
-- **English voice only.** Slovak names are read with an English accent.
+- **English voice, Slovak names.** The voice is English, but Slovak names are sent to it as Slovak phonemes (from espeak-ng, via Piper's `[[ phonemes ]]` syntax), so "Štrkovec" sounds Slovak instead of being spelled out. It's still an English voice making sounds it wasn't trained on, and words of a name without Slovak letters (the "Mesto" in "Nové Mesto") stay English.
 
 ## Built for
 

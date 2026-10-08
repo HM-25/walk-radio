@@ -6,7 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-08
+
 ### Added
+- Slovak pronunciation in the audio stage: Slovak words (Slovak diacritics, or part of a stop name) are sent to Piper as Slovak IPA from its bundled espeak-ng, using Piper's inline `[[ phonemes ]]` syntax. Story text files are unchanged. The English voice had been reading "Štrkovec" as letter soup.
 - `out/walk.gpx` with the stops as named waypoints (linked to their Wikipedia article) and a route in walking order.
 - Warning when a story looks like Slovak instead of English.
 
@@ -59,5 +62,6 @@ Problems found and fixed while building 0.1.0:
 - The intro said "Next stop: Kuchajda. You're already there." right after "This walk starts right by Kuchajda". The first leg now reads "First stop".
 - Packaging: `uv_build` looked for a `walk_radio` module; the module name is now set to `walkradio`.
 
-[Unreleased]: https://github.com/HM-25/walk-radio/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/HM-25/walk-radio/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/HM-25/walk-radio/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/HM-25/walk-radio/releases/tag/v0.1.0

@@ -77,7 +77,7 @@ def main() -> None:
     t_stories = time.time()
 
     print("\nAudio:")
-    renderer = audio.Renderer()
+    renderer = audio.Renderer(pronounce=audio.SlovakPronouncer(audio.stop_name_words(route)))
     tracks = []
     intro = OUT / "audio" / "00-intro.mp3"
     renderer.render(audio.intro_script(route), intro)
