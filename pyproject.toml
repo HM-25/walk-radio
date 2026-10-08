@@ -1,0 +1,19 @@
+[project]
+name = "walk-radio"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "piper-tts>=1.8.0",
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+walkradio = "walkradio.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "walkradio"
