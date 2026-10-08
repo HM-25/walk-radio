@@ -1,5 +1,6 @@
 """Filter raw OSM results down to walk-worthy places, and order them into a walk."""
 import math
+from itertools import permutations
 
 # A place is kept if it matches at least one of these (key -> allowed values, "*" = any)
 KEEP = {
@@ -86,22 +87,43 @@ def bearing(lat1, lon1, lat2, lon2) -> str:
     return COMPASS[round(deg / 45) % 8]
 
 
-def nearest_next(lat: float, lon: float, candidates: list[dict], stops: int, accept) -> list[dict]:
-    """Greedy walk: from the current point, go to the nearest unvisited place.
+MAX_STOPS = 8  # 8! = 40,320 orders, instant. 10! would be 3.6M, still ok but pointless for a walk
 
-    `accept(place)` is called on each pick; if it returns False the place is skipped
-    (e.g. no usable Wikipedia summary) and the next nearest is tried.
+
+def pick_nearest(lat: float, lon: float, candidates: list[dict], stops: int, accept) -> list[dict]:
+    """The `stops` places closest to the start that pass `accept(place)`.
+
+    `accept` returning False skips a place (e.g. no usable Wikipedia intro).
     """
-    remaining = list(candidates)
-    route = []
-    cur = (lat, lon)
-    while remaining and len(route) < stops:
-        remaining.sort(key=lambda p: distance_m(*cur, p["lat"], p["lon"]))
-        p = remaining.pop(0)
-        if not accept(p):
-            continue
+    picked = []
+    for p in sorted(candidates, key=lambda p: distance_m(lat, lon, p["lat"], p["lon"])):
+        if len(picked) == stops:
+            break
+        if accept(p):
+            picked.append(p)
+    return picked
+
+
+def _path_length(start: tuple[float, float], order: tuple[dict, ...]) -> float:
+    total, cur = 0.0, start
+    for p in order:
+        total += distance_m(*cur, p["lat"], p["lon"])
+        cur = (p["lat"], p["lon"])
+    return total
+
+
+def shortest_order(lat: float, lon: float, stops: list[dict]) -> list[dict]:
+    """Brute-force the shortest open path from the start through every stop.
+
+    Straight-line distances, not real paths. Adds leg_m / leg_dir to each stop.
+    """
+    if len(stops) > MAX_STOPS:
+        raise ValueError(f"brute force is capped at {MAX_STOPS} stops, got {len(stops)}")
+    start = (lat, lon)
+    best = list(min(permutations(stops), key=lambda order: _path_length(start, order), default=()))
+    cur = start
+    for p in best:
         p["leg_m"] = round(distance_m(*cur, p["lat"], p["lon"]))
         p["leg_dir"] = bearing(*cur, p["lat"], p["lon"])
-        route.append(p)
         cur = (p["lat"], p["lon"])
-    return route
+    return best
