@@ -3,3 +3,5 @@ voices/
 out/
 __pycache__/
 cache/
+CLAUDE.md
+.claude/
