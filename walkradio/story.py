@@ -1,4 +1,4 @@
-"""Story stage: a local model turns one Wikipedia intro into a ~80-word spoken story.
+"""Story stage: a local model turns one Wikipedia intro into a 40 to 80 word spoken story.
 
 Test on one stop: uv run python -m walkradio.story [stop_number]
 """
@@ -17,23 +17,47 @@ STORIES_DIR = Path("out/stories")
 MAX_SOURCE_CHARS = 1200  # prompt reading is the bottleneck on this CPU, keep it short
 
 PROMPT = """You are a friendly audio guide. Someone is walking past {name} in Bratislava with headphones on.
-Write 70 to 80 words in English, translate any foreign words. Output only the words to be spoken.
-Use ONLY facts from the source text below. If the source does not say it, do not say it.
-No greeting, no stage directions, no sound effects, no headings, no lists, no emoji. Do not mention Wikipedia.
+Write in English, at most {words} words. Translate the facts into English; only proper names stay in Slovak. Output only the words to be spoken.
+Use ONLY facts from the source text below. If the source does not say it, do not say it. Never pad: no praise, no filler.
+Keep every proper name and title (places, streets, churches, plays, organisations) exactly in the original Slovak.
+You may follow a name with a short English explanation, for example: Radošinské naivné divadlo, the Radošina Naive Theatre.
+No greeting, no stage directions, no sound effects, no headings, no lists, no emoji, no markdown. Do not mention Wikipedia.
 
 Source text ({lang} Wikipedia):
 {source}"""
 
 
+def word_budget(source: str) -> int:
+    """A short source gets a short story: half the source's words, clamped to 40..80."""
+    return max(40, min(80, len(source.split()) // 2))
+
+
 def _clean(text: str) -> str:
     """Drop stage directions like '(Sound of music fades in)' that TTS would read aloud."""
     text = re.sub(r"^\s*[(*\[].*?[)*\]]\s*$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"[*_]+", "", text)  # markdown emphasis around titles
     return re.sub(r"\n{2,}", "\n\n", text).strip()
+
+
+def trim_to_sentence(text: str) -> str:
+    """Cut a story that hit the token cap back to its last complete sentence."""
+    end = max(text.rfind(c) for c in ".!?")
+    return text[: end + 1] if end > 0 else text
+
+
+# Common Slovak function words; if many show up, Gemma answered in Slovak instead of English
+SLOVAK_WORDS = {"je", "a", "v", "sa", "na", "z", "so", "pri", "ktorý", "ktorá", "bolo", "nachádza", "alebo"}
+
+
+def looks_slovak(text: str) -> bool:
+    words = re.findall(r"\w+", text.lower())
+    return bool(words) and sum(w in SLOVAK_WORDS for w in words) / len(words) > 0.08
 
 
 def write_story(stop: dict) -> dict:
     s = stop["summary"]
-    prompt = PROMPT.format(name=stop["name"], lang=s["lang"], source=s["extract"][:MAX_SOURCE_CHARS])
+    source = s["extract"][:MAX_SOURCE_CHARS]
+    prompt = PROMPT.format(name=stop["name"], lang=s["lang"], source=source, words=word_budget(source))
     r = requests.post(OLLAMA_URL, json={
         "model": MODEL,
         "prompt": prompt,
@@ -42,8 +66,11 @@ def write_story(stop: dict) -> dict:
     }, timeout=600)
     r.raise_for_status()
     d = r.json()
+    text = _clean(d["response"])
+    if d.get("done_reason") == "length":
+        text = trim_to_sentence(text)
     return {
-        "text": _clean(d["response"]),
+        "text": text,
         "model": MODEL,
         "prompt_tokens": d.get("prompt_eval_count"),
         "output_tokens": d.get("eval_count"),
@@ -83,6 +110,8 @@ def get_story(n: int, stop: dict, generate: bool = True) -> tuple[str, bool]:
     foreign = sorted({w for w in re.findall(r"\w+", text) if any(c.isalpha() and ord(c) > 0x24F for c in w)})
     if foreign:
         print(f"    WARNING non-Latin words, edit {path}: {', '.join(foreign)}")
+    if looks_slovak(text):
+        print(f"    WARNING looks like Slovak, not English, edit or delete {path}")
     return text, generated
 
 

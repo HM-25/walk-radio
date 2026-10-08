@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `out/walk.gpx` with the stops as named waypoints (linked to their Wikipedia article) and a route in walking order.
+- Warning when a story looks like Slovak instead of English.
+
+### Changed
+- Stop selection now picks the best subset, not the nearest N: the N stops and order with the shortest total route, no leg over 1200 m, from up to 12 candidates. Exact, via a subset DP.
+- Story prompt: proper names and titles stay in Slovak, optionally with a short English explanation; no padding; word budget scales with source length (40 to 80 words).
+
+### Fixed
+- Stories that hit the output token cap are trimmed to the last complete sentence instead of ending mid-sentence.
+- Markdown emphasis (`*title*`) is stripped before speech.
+
 ## [0.1.0] - 2026-10-08
 
 ### Added

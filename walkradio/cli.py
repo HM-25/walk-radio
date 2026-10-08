@@ -4,7 +4,7 @@ import json
 import time
 from pathlib import Path
 
-from . import audio, overpass, places, story, wiki
+from . import audio, gpx, overpass, places, story, wiki
 
 KUCHAJDA = (48.1696, 17.1449)  # lake centre, OSM relation/2880173
 OUT = Path("out")
@@ -24,10 +24,13 @@ def build_route(args) -> list[dict]:
         p["summary"] = s
         return True
 
-    picked = places.pick_nearest(args.lat, args.lon, candidates, args.stops, accept)
-    route = places.shortest_order(args.lat, args.lon, picked)
-    if len(route) < args.stops:
-        print(f"\nOnly found {len(route)} of {args.stops} stops, try a bigger --radius.")
+    pool = places.usable(args.lat, args.lon, candidates, accept)
+    print(f"\n{len(pool)} candidates with a usable intro, choosing the best {args.stops}"
+          f" (shortest route, no leg over {places.MAX_LEG_M} m) ...")
+    route = places.best_route(args.lat, args.lon, pool, args.stops)
+    if not route:
+        raise SystemExit(f"No {args.stops}-stop route with every leg under {places.MAX_LEG_M} m,"
+                         " try fewer --stops or another start.")
 
     total = sum(p["leg_m"] for p in route)
     print(f"\nWalk: {len(route)} stops, ~{total / 1000:.1f} km as the crow flies (real path is longer)\n")
@@ -39,6 +42,7 @@ def build_route(args) -> list[dict]:
     walk = {"start": {"lat": args.lat, "lon": args.lon}, "radius_m": args.radius, "stops": route}
     OUT.mkdir(exist_ok=True)
     (OUT / "walk.json").write_text(json.dumps(walk, ensure_ascii=False, indent=2), encoding="utf-8")
+    gpx.write_gpx((args.lat, args.lon), route, OUT / "walk.gpx")
     return route
 
 
