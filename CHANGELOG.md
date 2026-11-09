@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Overpass responses that hit the server-side timeout (HTTP 200 with a runtime error `remark` and partial elements) are treated as a failed endpoint: the next mirror is tried and the broken result is no longer cached.
+- A truncated cache file (from an interrupted run) no longer crashes every later run; it is treated as a miss and refetched. Cache entries are now written to a temp file and swapped in.
+
 ## [0.2.0] - 2026-10-08
 
 ### Added
