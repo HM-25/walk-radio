@@ -31,9 +31,15 @@ out center tags;
                 timeout=60,
             )
             r.raise_for_status()
-            elements = r.json()["elements"]
+            data = r.json()
+            # A query that hits the server-side timeout still returns 200, with a
+            # "remark" and partial (often empty) elements. Don't accept or cache that.
+            remark = data.get("remark", "")
+            if "error" in remark.lower():
+                raise ValueError(remark.strip())
+            elements = data["elements"]
             break
-        except (requests.RequestException, ValueError) as e:
+        except (requests.RequestException, ValueError, KeyError) as e:
             print(f"  {url} failed: {e}")
     else:
         raise SystemExit("All Overpass endpoints failed, try again in a minute")
