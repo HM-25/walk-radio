@@ -57,6 +57,10 @@ def main() -> None:
     args = ap.parse_args()
     if not 1 <= args.stops <= places.MAX_STOPS:
         ap.error(f"--stops must be 1..{places.MAX_STOPS}")
+    if not 100 <= args.radius <= 10_000:
+        ap.error("--radius must be 100..10000 metres")
+    if args.audio_only and not (OUT / "walk.json").exists():
+        ap.error(f"--audio-only needs {OUT / 'walk.json'} from a previous full run")
 
     t0 = time.time()
     if args.audio_only:
